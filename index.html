@@ -39,12 +39,14 @@
             </div>
             <div class="result-visuals" id="result-visuals" hidden>
               <div id="answer-score" class="score"></div>
-              <div id="pitch-meter" class="pitch-meter-result" role="status" hidden></div>
+              <div id="pitch-meter" class="pitch-meter-result" hidden></div>
+              <span id="meter-announcement" class="visually-hidden" role="status"></span>
             </div>
             <p id="feedback" class="feedback" role="status" hidden></p>
             <div class="actions">
               <button id="primary" class="button button-primary" type="button">Start round</button>
               <button id="secondary" class="button button-secondary" type="button" hidden></button>
+              <button id="track-pitch" class="button button-secondary hold-button" type="button" aria-keyshortcuts="C" hidden>Hold to track pitch</button>
             </div>
             <div class="result-actions" id="result-actions" hidden>
               <button id="play-answer" class="text-button" type="button">Play final pitch</button>
@@ -52,8 +54,8 @@
             </div>
           </div>
           <div class="practice-footer">
-            <span class="key-hint"><kbd>Space</kbd> or <kbd>Enter</kbd> to continue</span>
-            <span class="key-hint-touch">Follow each cue silently.</span>
+            <span class="key-hint"><kbd>Space</kbd> or <kbd>Enter</kbd> to act <span id="arrow-hint" hidden> · <kbd>←</kbd> <kbd>→</kbd> to choose</span><span id="track-hint" hidden> · Hold <kbd>C</kbd> to track</span></span>
+            <span class="key-hint-touch" id="touch-hint">Follow each cue silently.</span>
           </div>
         </section>
 
@@ -72,6 +74,14 @@
               <span>Auto-check after reveal</span>
             </label>
             <p class="side-copy mic-copy">Sing when the reference tone ends. Microphone audio stays on this device.</p>
+            <div id="rotation-setting" hidden>
+              <label class="checkbox" for="rotation-check">
+                <input type="checkbox" id="rotation-check" aria-describedby="rotation-help">
+                <span>Track pitch when I turn my phone</span>
+              </label>
+              <p class="side-copy" id="rotation-help">At the final pitch, turn sideways to track and upright to stop. Keep screen rotation enabled.</p>
+              <p class="side-copy" id="rotation-status" role="status"></p>
+            </div>
           </section>
         </aside>
       </div>

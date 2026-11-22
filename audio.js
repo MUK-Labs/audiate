@@ -4,6 +4,10 @@ const minimumHz = 55;
 const maximumHz = 1500;
 const listeningTime = 10000;
 const sampleInterval = 60;
+const microphoneConstraints = {
+  audio: { channelCount: 1, echoCancellation: true, noiseSuppression: false, autoGainControl: false },
+  video: false,
+};
 const quiet = 0.0001;
 const pianoPartials = [
   { harmonic: 1, peak: 0.18 },
@@ -169,7 +173,58 @@ export class ExerciseAudio {
     resolve();
   }
 
-  async listen({ onStatus = () => {}, signal } = {}) {
+  prepareMicrophone({ signal } = {}) {
+    return this.#capturePitch({ signal });
+  }
+
+  listen({ onStatus, signal } = {}) {
+    const recentPitches = [];
+    let lastDetection = 0;
+    return this.#capturePitch({
+      onStatus,
+      signal,
+      timeout: listeningTime,
+      onSample(midi, now) {
+        if (midi === null) return;
+        if (now - lastDetection > 180) recentPitches.length = 0;
+        lastDetection = now;
+        recentPitches.push(midi);
+        if (recentPitches.length > 6) recentPitches.shift();
+        if (recentPitches.length < 5) return;
+
+        const sorted = [...recentPitches].sort((a, b) => a - b);
+        const middle = Math.floor(sorted.length / 2);
+        const center = (sorted[middle] + sorted[Math.floor((sorted.length - 1) / 2)]) / 2;
+        if (sorted.filter(pitch => Math.abs(pitch - center) <= 0.42).length >= 5) return center;
+      },
+    });
+  }
+
+  track({ onStatus, onPitch = () => {}, signal } = {}) {
+    const recentPitches = [];
+    let lastDetection = -Infinity;
+    let reportingSilence = false;
+    return this.#capturePitch({
+      onStatus,
+      signal,
+      onSample(midi, now) {
+        if (midi !== null) {
+          if (now - lastDetection > 180) recentPitches.length = 0;
+          lastDetection = now;
+          recentPitches.push(midi);
+          if (recentPitches.length > 3) recentPitches.shift();
+          const sorted = [...recentPitches].sort((a, b) => a - b);
+          reportingSilence = false;
+          onPitch(sorted[Math.floor(sorted.length / 2)]);
+        } else if (now - lastDetection > 120 && !reportingSilence) {
+          reportingSilence = true;
+          onPitch(null);
+        }
+      },
+    });
+  }
+
+  async #capturePitch({ onStatus = () => {}, onSample, signal, timeout = Infinity }) {
     const cancelled = () => new DOMException('Pitch check cancelled.', 'AbortError');
     if (signal?.aborted) throw cancelled();
     const devices = globalThis.navigator?.mediaDevices;
@@ -179,7 +234,7 @@ export class ExerciseAudio {
 
     return new Promise((resolve, reject) => {
       let active = true;
-      let stream;
+      let tracks = [];
       let source;
       let analyser;
       let mutedOutput;
@@ -193,7 +248,10 @@ export class ExerciseAudio {
         source?.disconnect();
         analyser?.disconnect();
         mutedOutput?.disconnect();
-        stream?.getTracks().forEach(track => track.stop());
+        for (const track of tracks) {
+          track.removeEventListener?.('ended', ended);
+          track.stop();
+        }
         if (error) reject(error);
         else resolve(pitch);
       }
@@ -202,19 +260,30 @@ export class ExerciseAudio {
         finish(null, cancelled());
       }
 
+      function ended() {
+        finish(null, new Error('Microphone input stopped. Try again to resume tracking.'));
+      }
+
       const begin = async () => {
         try {
           onStatus('Allow microphone access to check your pitch.');
           const context = await this.ready();
           if (!active) return;
-          stream = await devices.getUserMedia({
-            audio: { channelCount: 1, echoCancellation: true, noiseSuppression: false, autoGainControl: false },
-            video: false,
-          });
+          const stream = await devices.getUserMedia(microphoneConstraints);
+          tracks = stream.getTracks();
           if (!active) {
-            stream.getTracks().forEach(track => track.stop());
+            tracks.forEach(track => track.stop());
             return;
           }
+          if (!tracks.length || tracks.every(track => track.readyState === 'ended')) {
+            ended();
+            return;
+          }
+          if (!onSample) {
+            finish(null);
+            return;
+          }
+          for (const track of tracks) track.addEventListener?.('ended', ended);
 
           source = context.createMediaStreamSource(stream);
           analyser = context.createAnalyser();
@@ -226,9 +295,7 @@ export class ExerciseAudio {
           mutedOutput.connect(context.destination);
 
           const samples = new Float32Array(analyser.fftSize);
-          const deadline = performance.now() + listeningTime;
-          const recentPitches = [];
-          let lastDetection = 0;
+          const deadline = performance.now() + timeout;
 
           const sample = () => {
             const now = performance.now();
@@ -237,28 +304,22 @@ export class ExerciseAudio {
               return;
             }
 
-            analyser.getFloatTimeDomainData(samples);
-            const frequency = estimatePitch(samples, context.sampleRate);
-            if (frequency !== null) {
-              if (now - lastDetection > 180) recentPitches.length = 0;
-              lastDetection = now;
-              recentPitches.push(69 + 12 * Math.log2(frequency / 440));
-              if (recentPitches.length > 6) recentPitches.shift();
-
-              if (recentPitches.length >= 5) {
-                const sorted = [...recentPitches].sort((a, b) => a - b);
-                const middle = Math.floor(sorted.length / 2);
-                const center = (sorted[middle] + sorted[Math.floor((sorted.length - 1) / 2)]) / 2;
-                if (sorted.filter(pitch => Math.abs(pitch - center) <= 0.42).length >= 5) {
-                  finish(center);
-                  return;
-                }
+            try {
+              analyser.getFloatTimeDomainData(samples);
+              const frequency = estimatePitch(samples, context.sampleRate);
+              const midi = frequency === null ? null : 69 + 12 * Math.log2(frequency / 440);
+              const result = onSample(midi, now);
+              if (result !== undefined) {
+                finish(result);
+              } else if (active) {
+                timer = setTimeout(sample, sampleInterval);
               }
+            } catch (error) {
+              finish(null, error);
             }
-            timer = setTimeout(sample, sampleInterval);
           };
 
-          onStatus('Listening. Sing and hold your note.');
+          onStatus('Listening. Sing and hold your note.', true);
           if (active) timer = setTimeout(sample, 160);
         } catch (error) {
           finish(null, microphoneError(error));

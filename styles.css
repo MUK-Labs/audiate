@@ -16,6 +16,14 @@
 
 *, *::before, *::after { box-sizing: border-box; }
 [hidden] { display: none !important; }
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
 body { margin: 0; line-height: 1.55; }
 button, select { font: inherit; }
 button { cursor: pointer; }
@@ -75,7 +83,7 @@ h1 {
 }
 #round-level { color: var(--accent); font-weight: 700; }
 #round-position { text-align: right; font-variant-numeric: tabular-nums; }
-.practice-footer { justify-content: center; border-top: 1px solid var(--line); }
+.practice-footer { justify-content: center; border-top: 1px solid var(--line); text-align: center; }
 .stage {
   display: flex;
   min-height: 375px;
@@ -119,6 +127,8 @@ h1 {
 .button-primary:hover { background: var(--accent-hover); }
 .button-secondary { border-color: var(--line); background: white; color: var(--accent); }
 .button-secondary:hover, .text-button:hover { background: var(--pale); }
+.hold-button { touch-action: none; user-select: none; -webkit-user-select: none; }
+.hold-button[data-tracking] { border-color: var(--accent); background: var(--pale); }
 .classroom-button { min-height: 38px; padding: 6px 10px; font-size: .875rem; }
 .button:disabled, .text-button:disabled { opacity: .58; }
 .text-button {
@@ -202,6 +212,8 @@ select {
 .checkbox { display: flex; align-items: flex-start; gap: 8px; margin-top: 13px; font-size: .875rem; }
 .checkbox input { flex: none; width: 16px; height: 16px; margin: 3px 0 0; accent-color: var(--accent); }
 .mic-copy { margin-top: 5px; }
+#rotation-status { color: var(--accent); }
+#rotation-status:empty { display: none; }
 .site-footer {
   display: flex;
   justify-content: space-between;

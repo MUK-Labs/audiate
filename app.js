@@ -2,6 +2,7 @@ import { ExerciseAudio } from './audio.js';
 import { LEVELS, RANGES, generateRound, noteName, pitchName } from './exercise.js';
 import { renderNotation } from './notation.js';
 import { renderPitchMeter } from './pitch-meter.js';
+import { phoneRotation } from './rotation.js';
 
 const STORAGE_KEY = 'muk-labs.audiate.progress.v1';
 const ROUNDS_PER_LEVEL = 3;
@@ -10,7 +11,9 @@ const ui = Object.fromEntries(
   ['total-rounds', 'round-level', 'round-position', 'prompt-symbol', 'prompt-title',
     'prompt-detail', 'answer-score', 'pitch-meter', 'result-visuals', 'feedback', 'primary',
     'secondary', 'result-actions', 'play-answer', 'play-chain', 'level-list', 'range',
-    'auto-check', 'storage-status', 'practice', 'classroom-toggle']
+    'auto-check', 'storage-status', 'practice', 'classroom-toggle', 'track-pitch',
+    'arrow-hint', 'track-hint', 'touch-hint', 'rotation-setting', 'rotation-check',
+    'rotation-status', 'meter-announcement']
     .map(id => [id, document.getElementById(id)]),
 );
 
@@ -58,7 +61,9 @@ let mic = null;
 let playback = false;
 let renderedScore = null;
 let comparison = null;
-let renderedComparison = null;
+let tracking = null;
+let rotationReady = false;
+let rotationSetup = null;
 let classroom = false;
 let nativeFullscreen = false;
 
@@ -70,6 +75,19 @@ for (const [index, range] of RANGES.entries()) {
 }
 ui.range.value = String(progress.range);
 ui['auto-check'].checked = progress.autoCheck;
+ui['rotation-setting'].hidden = !phoneRotation.available;
+ui['rotation-check'].checked = false;
+
+const holdButton = ui['track-pitch'];
+const practiceActions = [ui.primary, ui.secondary, holdButton, ui['play-answer'], ui['play-chain']];
+
+function availableActions() {
+  return practiceActions.filter(button => !button.disabled && !button.closest('[hidden]'));
+}
+
+function atFinalPitch() {
+  return phase === 'sing' || phase === 'result';
+}
 
 function plural(count, word) {
   return `${count} ${word}${count === 1 ? '' : 's'}`;
@@ -157,13 +175,13 @@ function render() {
     title = 'Sing the final pitch';
     detail = 'Hold the note you arrived at, then reveal the answer.';
     primary = 'Reveal answer';
-    secondary = mic ? 'Cancel pitch check' : 'Check before reveal';
+    secondary = mic && !tracking ? 'Cancel pitch check' : 'Check before reveal';
   } else if (isResult) {
     position = 'Round complete';
     title = noteName(round.notes.at(-1));
     detail = 'Final pitch';
     primary = nextLevel === null ? 'Next round' : `Start level ${nextLevel + 1}`;
-    secondary = mic ? 'Cancel pitch check' : 'Check my pitch';
+    secondary = mic && !tracking ? 'Cancel pitch check' : 'Check my pitch';
   }
 
   text(ui['round-level'], `Level ${progress.level + 1} · ${level.name}`);
@@ -175,11 +193,16 @@ function render() {
   text(ui.secondary, secondary);
   ui.secondary.hidden = !secondary;
   ui.primary.disabled = Boolean(playback || mic);
-  ui.secondary.disabled = playback;
+  ui.secondary.disabled = Boolean(playback || tracking);
+  holdButton.hidden = !atFinalPitch();
+  holdButton.disabled = Boolean(playback || (mic && !tracking) || tracking?.source === 'rotation');
+  holdButton.toggleAttribute('data-tracking', Boolean(tracking));
+  text(holdButton, tracking?.source === 'toggle' ? 'Stop tracking'
+    : tracking ? 'Tracking pitch…' : 'Hold to track pitch');
   ui['result-actions'].hidden = !isResult;
   ui['play-answer'].disabled = Boolean(playback || mic);
   ui['play-chain'].disabled = Boolean(playback || mic);
-  ui['result-visuals'].hidden = !isResult;
+  ui['answer-score'].hidden = !isResult;
   if (isResult && renderedScore !== round) {
     renderNotation(ui['answer-score'], round);
     renderedScore = round;
@@ -188,13 +211,42 @@ function render() {
     ui['answer-score'].replaceChildren();
     renderedScore = null;
   }
-  const visibleComparison = isResult ? comparison : null;
-  if (renderedComparison !== visibleComparison) {
-    renderPitchMeter(ui['pitch-meter'], visibleComparison);
-    renderedComparison = visibleComparison;
-  }
+  renderComparison();
+  text(ui['meter-announcement'], comparison && !comparison.live
+    ? ui['pitch-meter'].firstElementChild?.getAttribute('aria-label') ?? ''
+    : '');
+  ui['arrow-hint'].hidden = availableActions().length < 2;
+  ui['track-hint'].hidden = !atFinalPitch();
+  text(ui['touch-hint'], rotationReady && atFinalPitch()
+    ? 'Turn sideways to track and upright to stop.'
+    : atFinalPitch() ? 'Hold the pitch tracking button to follow your voice.' : 'Follow each cue silently.');
   ui.feedback.hidden = !status;
   text(ui.feedback, status);
+}
+
+function renderComparison() {
+  const show = atFinalPitch() && comparison;
+  ui['result-visuals'].hidden = phase !== 'result' && !show;
+  ui.practice.toggleAttribute('data-live-tracking', Boolean(tracking));
+  if (!show) {
+    renderPitchMeter(ui['pitch-meter'], null);
+    return;
+  }
+
+  const target = round.notes.at(-1);
+  const { live, midi, minMidi, maxMidi } = comparison;
+  const centsFromTarget = pitch => (pitch - target.midi) * 100;
+  const targetName = phase === 'result' ? noteName(target) : undefined;
+  renderPitchMeter(ui['pitch-meter'], {
+    live,
+    cents: midi === null ? null : centsFromTarget(midi),
+    minCents: minMidi === undefined ? undefined : centsFromTarget(minMidi),
+    maxCents: maxMidi === undefined ? undefined : centsFromTarget(maxMidi),
+    targetName,
+    sungName: targetName && midi !== null
+      ? (Math.round(midi) === target.midi ? targetName : pitchName(midi))
+      : undefined,
+  });
 }
 
 function chooseLevel(index) {
@@ -210,6 +262,7 @@ function chooseLevel(index) {
 function resetRound() {
   mic?.abort();
   mic = null;
+  tracking = null;
   audio.stopPlayback();
   playback = false;
   round = null;
@@ -269,6 +322,7 @@ async function reveal(currentRound, autoCheck) {
   renderLevels();
   const played = await play(currentRound.notes.at(-1).midi, currentRound);
   if (round !== currentRound) return;
+  if (syncRotationTracking()) return;
   if (played && autoCheck) {
     await checkPitch(false);
   } else {
@@ -278,7 +332,6 @@ async function reveal(currentRound, autoCheck) {
 
 async function checkPitch(beforeReveal) {
   const currentRound = round;
-  const target = currentRound.notes.at(-1);
   const controller = new AbortController();
   mic = controller;
   comparison = null;
@@ -291,7 +344,6 @@ async function checkPitch(beforeReveal) {
     await audio.ready();
     if (controller.signal.aborted) return;
     measured = await audio.listen({
-      targetMidi: target.midi,
       signal: controller.signal,
       onStatus(message) {
         if (mic !== controller || controller.signal.aborted) return;
@@ -301,14 +353,7 @@ async function checkPitch(beforeReveal) {
     });
     if (controller.signal.aborted) return;
     status = measured === null ? 'No steady pitch heard. Try again and hold one note.' : '';
-    if (measured !== null) {
-      const targetName = noteName(target);
-      comparison = {
-        cents: (measured - target.midi) * 100,
-        targetName,
-        sungName: Math.round(measured) === target.midi ? targetName : pitchName(measured),
-      };
-    }
+    if (measured !== null) comparison = { midi: measured };
   } catch (error) {
     if (controller.signal.aborted) return;
     status = error.message || 'The microphone is unavailable.';
@@ -327,6 +372,64 @@ async function checkPitch(beforeReveal) {
   }
 }
 
+function startTracking(source, control) {
+  if (!atFinalPitch() || playback || tracking || document.hidden) return false;
+  mic?.abort();
+  const controller = new AbortController();
+  mic = controller;
+  const session = { source, control, lastMidi: null };
+  tracking = session;
+  comparison = { live: true, midi: null };
+  status = 'Opening the microphone…';
+  render();
+
+  void audio.track({
+    signal: controller.signal,
+    onStatus(message, listening) {
+      if (tracking !== session) return;
+      status = listening ? '' : message;
+      render();
+      if (source === 'rotation' && listening) {
+        ui['pitch-meter'].scrollIntoView({ block: 'nearest' });
+      }
+    },
+    onPitch(midi) {
+      if (tracking !== session) return;
+      comparison.midi = midi;
+      if (midi !== null) {
+        session.lastMidi = midi;
+        comparison.minMidi = Math.min(comparison.minMidi ?? midi, midi);
+        comparison.maxMidi = Math.max(comparison.maxMidi ?? midi, midi);
+      }
+      renderComparison();
+    },
+  }).then(() => {
+    if (tracking === session) stopTracking();
+  }).catch(error => {
+    if (tracking === session) stopTracking(error.message || 'The microphone is unavailable.');
+  });
+  return true;
+}
+
+function stopTracking(message) {
+  if (!tracking) return;
+  const { lastMidi } = tracking;
+  tracking = null;
+  mic.abort();
+  mic = null;
+  comparison = lastMidi === null ? null : { ...comparison, live: false, midi: lastMidi };
+  status = message ?? (comparison ? '' : 'No pitch captured.');
+  render();
+}
+
+function syncRotationTracking() {
+  if (!rotationReady || !phoneRotation.isLandscape() || !atFinalPitch()) {
+    if (tracking?.source === 'rotation') stopTracking();
+    return false;
+  }
+  return tracking?.source === 'rotation' || startTracking('rotation');
+}
+
 function advance() {
   if (playback || mic) return;
   if (phase === 'ready' || phase === 'result') {
@@ -335,6 +438,7 @@ function advance() {
     step += 1;
     if (step === round.cues.length) phase = 'sing';
     render();
+    syncRotationTracking();
   } else if (phase === 'sing') {
     status = '';
     void reveal(round, progress.autoCheck);
@@ -406,23 +510,127 @@ ui['auto-check'].addEventListener('change', () => {
   saveProgress();
 });
 
+const rotationCheck = ui['rotation-check'];
+rotationCheck.addEventListener('change', async () => {
+  rotationSetup?.abort();
+  rotationReady = false;
+  if (!rotationCheck.checked) {
+    rotationSetup = null;
+    text(ui['rotation-status'], '');
+    syncRotationTracking();
+    render();
+    return;
+  }
+
+  const controller = new AbortController();
+  rotationSetup = controller;
+  text(ui['rotation-status'], 'Waiting for microphone permission…');
+  try {
+    await audio.prepareMicrophone({ signal: controller.signal });
+    if (controller.signal.aborted) return;
+    rotationReady = true;
+    text(ui['rotation-status'], '');
+    syncRotationTracking();
+    render();
+  } catch (error) {
+    if (controller.signal.aborted) return;
+    rotationCheck.checked = false;
+    text(ui['rotation-status'], error.message || 'The microphone is unavailable.');
+  } finally {
+    if (rotationSetup === controller) rotationSetup = null;
+  }
+});
+phoneRotation.subscribe(syncRotationTracking);
+
+holdButton.addEventListener('pointerdown', event => {
+  if (!event.isPrimary || event.button !== 0) return;
+  if (tracking?.source === 'toggle') {
+    stopTracking();
+    return;
+  }
+  if (startTracking('pointer', event.pointerId)) {
+    holdButton.setPointerCapture(event.pointerId);
+  }
+});
+for (const type of ['pointerup', 'pointercancel', 'lostpointercapture']) {
+  holdButton.addEventListener(type, event => {
+    if (tracking?.source === 'pointer' && tracking.control === event.pointerId) stopTracking();
+  });
+}
+holdButton.addEventListener('contextmenu', event => event.preventDefault());
+holdButton.addEventListener('click', event => {
+  if (event.detail !== 0) return;
+  if (tracking?.source === 'toggle') stopTracking();
+  else startTracking('toggle');
+});
+
 document.addEventListener('keydown', event => {
+  if (event.key === 'Escape' && tracking) stopTracking();
   if (event.key === 'Escape' && classroom && !nativeFullscreen) {
     setClassroom(false);
     return;
   }
-  if (event.key !== 'Enter' && event.key !== ' ') return;
-  if (event.repeat) {
-    if (event.target === ui.primary) event.preventDefault();
+
+  if (event.defaultPrevented || event.altKey || event.ctrlKey || event.metaKey
+    || event.shiftKey || event.isComposing
+    || event.target.closest?.('input, select, textarea, [contenteditable]')) return;
+
+  const activationKey = event.key === 'Enter' || event.key === ' ';
+  if ((event.key.toLowerCase() === 'c' && atFinalPitch()) || (activationKey && event.target === holdButton)) {
+    event.preventDefault();
+    if (!event.repeat) {
+      if (tracking?.source === 'toggle') stopTracking();
+      else startTracking('key', event.key.toLowerCase());
+    }
     return;
   }
-  if (event.defaultPrevented || event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
-  if (event.target.closest?.('button, input, select, textarea, a, [contenteditable], [tabindex]')) return;
+
+  const focusedAction = practiceActions.includes(event.target);
+  if (!focusedAction && event.target.closest?.('button, a, [tabindex]')) return;
+  if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
+    const actions = availableActions();
+    if (actions.length < 2) return;
+    const current = Math.max(0, actions.indexOf(event.target));
+    const offset = event.key === 'ArrowRight' ? 1 : -1;
+    event.preventDefault();
+    actions[(current + offset + actions.length) % actions.length].focus();
+    return;
+  }
+  if (!activationKey) return;
+  if (event.repeat) {
+    event.preventDefault();
+    return;
+  }
+  if (focusedAction) return;
   event.preventDefault();
   advance();
 });
 
+document.addEventListener('keyup', event => {
+  if (tracking?.source !== 'key' || tracking.control !== event.key.toLowerCase()) return;
+  event.preventDefault();
+  stopTracking();
+});
+
+window.addEventListener('blur', () => {
+  if (tracking?.source === 'key') stopTracking();
+});
+
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden || !mic) return;
+  if (tracking) stopTracking();
+  else {
+    mic.abort();
+    mic = null;
+    status = '';
+    render();
+  }
+});
+
 window.addEventListener('pagehide', () => {
+  rotationSetup?.abort();
+  rotationSetup = null;
+  if (!rotationReady) rotationCheck.checked = false;
   if (!mic && !playback) return;
   resetRound();
   render();

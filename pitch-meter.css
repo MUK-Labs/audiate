@@ -41,6 +41,26 @@
   background: var(--muted);
 }
 
+.pitch-meter__band {
+  position: absolute;
+  inset-block-start: 50%;
+  left: var(--pitch-range-start);
+  right: calc(100% - var(--pitch-range-end));
+  min-width: 2px;
+  height: .55em;
+  transform: translateY(-50%);
+  border: 1px solid var(--accent);
+  border-radius: .3em;
+  background: #a6cdb6;
+}
+
+.pitch-meter__range {
+  display: block;
+  margin-top: .24em;
+  color: var(--muted);
+  font-size: .94em;
+}
+
 .pitch-meter__tick {
   position: absolute;
   inset-block-start: .6em;
@@ -82,6 +102,10 @@
   border-radius: 50%;
   background: var(--accent);
   box-shadow: 0 0 0 1px var(--accent);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .pitch-meter__marker { transition: left 80ms ease-out; }
 }
 
 .pitch-meter__marker[data-overflow]::before {
