@@ -1,7 +1,7 @@
-import { ExerciseAudio } from './audio.js';
+import { ExerciseAudio } from './audio.js?v=live-pitch';
 import { LEVELS, RANGES, generateRound, noteName, pitchName } from './exercise.js';
 import { renderNotation } from './notation.js';
-import { renderPitchMeter } from './pitch-meter.js';
+import { renderPitchMeter } from './pitch-meter.js?v=live-pitch';
 import { phoneRotation } from './rotation.js';
 
 const STORAGE_KEY = 'muk-labs.audiate.progress.v1';
