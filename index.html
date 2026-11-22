@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#ffffff">
+  <meta name="description" content="Practice inner hearing by following a chain of musical intervals.">
+  <title>Audiate · Interval chains</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='15' fill='%2314543c'/%3E%3Ctext x='50%25' y='46' fill='white' font-size='45' text-anchor='middle'%3E♪%3C/text%3E%3C/svg%3E">
+  <link rel="stylesheet" href="./styles.css">
+  <script type="module" src="./app.js"></script>
+</head>
+<body>
+  <div class="shell">
+    <header class="site-header">
+      <div class="wordmark"><span class="wordmark-icon" aria-hidden="true">♪</span> Audiate</div>
+      <span class="summary" id="total-rounds">0 rounds finished</span>
+    </header>
+
+    <main>
+      <div class="intro">
+        <h1>Interval chains</h1>
+        <p>Hear the first note, follow the intervals in your head, then sing the final pitch.</p>
+      </div>
+
+      <div class="layout">
+        <section class="practice" aria-label="Interval practice">
+          <div class="practice-header">
+            <span id="round-level"></span>
+            <span id="round-position"></span>
+          </div>
+          <div class="stage" id="stage">
+            <div class="stage-prompt" aria-live="polite" aria-atomic="true">
+              <span class="prompt-symbol" id="prompt-symbol" aria-hidden="true">♪</span>
+              <h2 id="prompt-title">Hear the starting note</h2>
+              <p id="prompt-detail"></p>
+            </div>
+            <div id="answer-score" class="score" hidden></div>
+            <p id="feedback" class="feedback" role="status" hidden></p>
+            <div class="actions">
+              <button id="primary" class="button button-primary" type="button">Start round</button>
+              <button id="secondary" class="button button-secondary" type="button" hidden></button>
+            </div>
+            <div class="result-actions" id="result-actions" hidden>
+              <button id="play-answer" class="text-button" type="button">Play final pitch</button>
+              <button id="play-chain" class="text-button" type="button">Play chain</button>
+            </div>
+          </div>
+          <div class="practice-footer">
+            <span class="key-hint"><kbd>Space</kbd> or <kbd>Enter</kbd> to continue</span>
+            <span class="key-hint-touch">Follow each cue silently.</span>
+          </div>
+        </section>
+
+        <aside class="sidebar" aria-label="Practice settings">
+          <section class="side-card" aria-labelledby="path-heading">
+            <h2 id="path-heading">Practice path</h2>
+            <p class="side-copy">Finish 3 rounds to unlock the next level.</p>
+            <ol class="level-list" id="level-list"></ol>
+          </section>
+          <section class="side-card settings" aria-labelledby="settings-heading">
+            <h2 id="settings-heading">Practice settings</h2>
+            <label class="range-label" for="range">Singing range</label>
+            <select id="range"></select>
+            <label class="checkbox" for="auto-check">
+              <input type="checkbox" id="auto-check">
+              <span>Auto-check after reveal</span>
+            </label>
+            <p class="side-copy mic-copy">Sing when the reference tone ends. Microphone audio stays on this device.</p>
+          </section>
+        </aside>
+      </div>
+    </main>
+
+    <footer class="site-footer">
+      <span id="storage-status">Progress is saved in this browser.</span>
+      <a href="https://github.com/MUK-Labs/audiate">Source on GitHub</a>
+    </footer>
+  </div>
+</body>
+</html>
