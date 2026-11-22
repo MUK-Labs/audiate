@@ -1,15 +1,16 @@
 import { ExerciseAudio } from './audio.js';
 import { LEVELS, RANGES, generateRound, noteName, pitchName } from './exercise.js';
 import { renderNotation } from './notation.js';
+import { renderPitchMeter } from './pitch-meter.js';
 
 const STORAGE_KEY = 'muk-labs.audiate.progress.v1';
 const ROUNDS_PER_LEVEL = 3;
-const MATCH_CENTS = 35;
 const audio = new ExerciseAudio();
 const ui = Object.fromEntries(
   ['total-rounds', 'round-level', 'round-position', 'prompt-symbol', 'prompt-title',
-    'prompt-detail', 'answer-score', 'feedback', 'primary', 'secondary', 'result-actions',
-    'play-answer', 'play-chain', 'level-list', 'range', 'auto-check', 'storage-status']
+    'prompt-detail', 'answer-score', 'pitch-meter', 'result-visuals', 'feedback', 'primary',
+    'secondary', 'result-actions', 'play-answer', 'play-chain', 'level-list', 'range',
+    'auto-check', 'storage-status', 'practice', 'classroom-toggle']
     .map(id => [id, document.getElementById(id)]),
 );
 
@@ -56,6 +57,10 @@ let status = '';
 let mic = null;
 let playback = false;
 let renderedScore = null;
+let comparison = null;
+let renderedComparison = null;
+let classroom = false;
+let nativeFullscreen = false;
 
 for (const [index, range] of RANGES.entries()) {
   const option = new Option(
@@ -174,7 +179,7 @@ function render() {
   ui['result-actions'].hidden = !isResult;
   ui['play-answer'].disabled = Boolean(playback || mic);
   ui['play-chain'].disabled = Boolean(playback || mic);
-  ui['answer-score'].hidden = !isResult;
+  ui['result-visuals'].hidden = !isResult;
   if (isResult && renderedScore !== round) {
     renderNotation(ui['answer-score'], round);
     renderedScore = round;
@@ -182,6 +187,11 @@ function render() {
   if (!isResult && renderedScore) {
     ui['answer-score'].replaceChildren();
     renderedScore = null;
+  }
+  const visibleComparison = isResult ? comparison : null;
+  if (renderedComparison !== visibleComparison) {
+    renderPitchMeter(ui['pitch-meter'], visibleComparison);
+    renderedComparison = visibleComparison;
   }
   ui.feedback.hidden = !status;
   text(ui.feedback, status);
@@ -207,6 +217,7 @@ function resetRound() {
   nextLevel = null;
   step = 0;
   status = '';
+  comparison = null;
 }
 
 async function play(notes, currentRound) {
@@ -265,19 +276,12 @@ async function reveal(currentRound, autoCheck) {
   }
 }
 
-function describePitch(midi, target) {
-  const cents = Math.round((midi - target.midi) * 100);
-  if (cents === 0) return `${pitchName(midi)} · matched ${noteName(target)}`;
-  const distance = `${Math.abs(cents)}¢ ${cents < 0 ? 'flat' : 'sharp'}`;
-  const summary = Math.abs(cents) <= MATCH_CENTS ? 'In tune' : `Heard ${pitchName(midi)}`;
-  return `${summary} · ${distance} from ${noteName(target)}`;
-}
-
 async function checkPitch(beforeReveal) {
   const currentRound = round;
   const target = currentRound.notes.at(-1);
   const controller = new AbortController();
   mic = controller;
+  comparison = null;
   status = 'Opening the microphone…';
   render();
   ui.secondary.focus();
@@ -296,9 +300,15 @@ async function checkPitch(beforeReveal) {
       },
     });
     if (controller.signal.aborted) return;
-    status = measured === null
-      ? 'No steady pitch heard. Try again and hold one note.'
-      : describePitch(measured, target);
+    status = measured === null ? 'No steady pitch heard. Try again and hold one note.' : '';
+    if (measured !== null) {
+      const targetName = noteName(target);
+      comparison = {
+        cents: (measured - target.midi) * 100,
+        targetName,
+        sungName: Math.round(measured) === target.midi ? targetName : pitchName(measured),
+      };
+    }
   } catch (error) {
     if (controller.signal.aborted) return;
     status = error.message || 'The microphone is unavailable.';
@@ -331,6 +341,43 @@ function advance() {
   }
 }
 
+function setClassroom(active) {
+  classroom = active;
+  document.documentElement.classList.toggle('classroom-view', active);
+  text(ui['classroom-toggle'], active ? 'Exit classroom view' : 'Classroom view');
+  if (active && !ui.primary.disabled) ui.primary.focus();
+  if (!active) ui['classroom-toggle'].focus();
+}
+
+ui['classroom-toggle'].addEventListener('click', async () => {
+  if (document.fullscreenElement === ui.practice) {
+    try {
+      await document.exitFullscreen();
+    } catch {
+      // The browser may have started exiting fullscreen already.
+    }
+    return;
+  }
+
+  setClassroom(!classroom);
+  if (classroom && ui.practice.requestFullscreen) {
+    try {
+      await ui.practice.requestFullscreen();
+    } catch {
+      // Classroom view also works within the browser window.
+    }
+  }
+});
+
+document.addEventListener('fullscreenchange', () => {
+  if (document.fullscreenElement === ui.practice) {
+    nativeFullscreen = true;
+  } else if (nativeFullscreen) {
+    nativeFullscreen = false;
+    setClassroom(false);
+  }
+});
+
 ui.primary.addEventListener('click', advance);
 ui.secondary.addEventListener('click', async () => {
   if (playback) return;
@@ -360,6 +407,10 @@ ui['auto-check'].addEventListener('change', () => {
 });
 
 document.addEventListener('keydown', event => {
+  if (event.key === 'Escape' && classroom && !nativeFullscreen) {
+    setClassroom(false);
+    return;
+  }
   if (event.key !== 'Enter' && event.key !== ' ') return;
   if (event.repeat) {
     if (event.target === ui.primary) event.preventDefault();

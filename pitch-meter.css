@@ -1,0 +1,103 @@
+.pitch-meter-result { width: 100%; }
+
+.pitch-meter {
+  width: min(100%, var(--pitch-meter-max-width, 28rem));
+  margin: 12px auto 0;
+  padding: .75em 1.15em .95em;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--paper);
+  font-size: var(--pitch-meter-font-size, .875rem);
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
+.pitch-meter__summary {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: .25em .75em;
+}
+
+.pitch-meter__sung { font-weight: 650; }
+.pitch-meter__error { color: var(--accent); }
+
+.pitch-meter__scale {
+  position: relative;
+  padding: 0 1.55em 1.4em;
+  margin-top: .65em;
+}
+
+.pitch-meter__target {
+  display: block;
+  color: var(--muted);
+  font-weight: 650;
+}
+
+.pitch-meter__axis {
+  position: relative;
+  height: 2px;
+  margin: 1em 0 .42em;
+  background: var(--muted);
+}
+
+.pitch-meter__tick {
+  position: absolute;
+  inset-block-start: .6em;
+  left: var(--pitch-position);
+  transform: translateX(-50%);
+  color: var(--muted);
+  font-size: .89em;
+  white-space: nowrap;
+}
+
+.pitch-meter__tick::before {
+  position: absolute;
+  inset-block-start: -.6em;
+  left: 50%;
+  width: 1px;
+  height: .46em;
+  transform: translateX(-50%);
+  background: var(--muted);
+  content: "";
+}
+
+.pitch-meter__tick--center { font-weight: 700; }
+
+.pitch-meter__tick--center::before {
+  inset-block-start: -1.75em;
+  width: 2px;
+  height: 2em;
+  background: var(--ink);
+}
+
+.pitch-meter__marker {
+  position: absolute;
+  inset-block-start: 50%;
+  left: var(--pitch-position);
+  width: 1em;
+  height: 1em;
+  transform: translate(-50%, -50%);
+  border: 2px solid var(--paper);
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+
+.pitch-meter__marker[data-overflow]::before {
+  position: absolute;
+  inset-block-start: 50%;
+  transform: translateY(-50%);
+  border: .28em solid transparent;
+  content: "";
+}
+
+.pitch-meter__marker[data-overflow="flat"]::before {
+  inset-inline-start: -.88em;
+  border-inline-end-color: var(--accent);
+}
+
+.pitch-meter__marker[data-overflow="sharp"]::before {
+  inset-inline-end: -.88em;
+  border-inline-start-color: var(--accent);
+}

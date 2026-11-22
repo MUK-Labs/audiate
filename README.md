@@ -6,7 +6,9 @@ Start a round to hear one pitch. Follow each interval silently as it appears, th
 
 There are five levels. Finish three rounds at a level to unlock the next one. You can return to unlocked levels and choose a comfortable singing range. This browser remembers your progress and settings.
 
-Use **Check before reveal** to measure the pitch you imagined. Use **Check my pitch** after reveal to compare your voice to the reference, or enable **Auto-check after reveal** to have the microphone listen as soon as the tone finishes. These checks are optional. The site processes microphone audio in your browser and saves no recordings.
+Choose **Classroom view** to fill the screen with the exercise and enlarge the cues and controls. Press **Escape** or choose **Exit classroom view** to return. Browsers without fullscreen support display the same layout inside the window.
+
+Use **Check before reveal** to measure the pitch you imagined. Use **Check my pitch** after reveal to compare your voice to the reference, or enable **Auto-check after reveal** to have the microphone listen as soon as the tone finishes. The pitch meter shows your sung note to the left of the target when you sing flat and to the right when you sing sharp. The site processes microphone audio in your browser and saves no recordings.
 
 ## Local development
 

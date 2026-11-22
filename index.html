@@ -8,6 +8,7 @@
   <title>Audiate · Interval chains</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='15' fill='%2314543c'/%3E%3Ctext x='50%25' y='46' fill='white' font-size='45' text-anchor='middle'%3E♪%3C/text%3E%3C/svg%3E">
   <link rel="stylesheet" href="./styles.css">
+  <link rel="stylesheet" href="./pitch-meter.css">
   <script type="module" src="./app.js"></script>
 </head>
 <body>
@@ -24,10 +25,11 @@
       </div>
 
       <div class="layout">
-        <section class="practice" aria-label="Interval practice">
+        <section class="practice" id="practice" aria-label="Interval practice">
           <div class="practice-header">
             <span id="round-level"></span>
             <span id="round-position"></span>
+            <button class="button button-secondary classroom-button" id="classroom-toggle" type="button">Classroom view</button>
           </div>
           <div class="stage" id="stage">
             <div class="stage-prompt" aria-live="polite" aria-atomic="true">
@@ -35,7 +37,10 @@
               <h2 id="prompt-title">Hear the starting note</h2>
               <p id="prompt-detail"></p>
             </div>
-            <div id="answer-score" class="score" hidden></div>
+            <div class="result-visuals" id="result-visuals" hidden>
+              <div id="answer-score" class="score"></div>
+              <div id="pitch-meter" class="pitch-meter-result" role="status" hidden></div>
+            </div>
             <p id="feedback" class="feedback" role="status" hidden></p>
             <div class="actions">
               <button id="primary" class="button button-primary" type="button">Start round</button>

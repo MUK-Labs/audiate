@@ -109,7 +109,7 @@ export function renderNotation(container, round) {
     display: 'block',
     width: '100%',
     minWidth: `${Math.floor(width * 0.88)}px`,
-    maxWidth: `${width}px`,
+    maxWidth: `calc(${width}px * var(--notation-scale, 1))`,
     height: 'auto',
     marginInline: 'auto',
     fontFamily: 'inherit',

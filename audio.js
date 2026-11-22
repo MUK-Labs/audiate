@@ -4,6 +4,13 @@ const minimumHz = 55;
 const maximumHz = 1500;
 const listeningTime = 10000;
 const sampleInterval = 60;
+const quiet = 0.0001;
+const pianoPartials = [
+  { harmonic: 1, peak: 0.18 },
+  { harmonic: 2, peak: 0.046, decay: 0.28 },
+  { harmonic: 3, peak: 0.026, decay: 0.17 },
+  { harmonic: 4, peak: 0.012, decay: 0.11 },
+];
 
 export function estimatePitch(samples, sampleRate) {
   // Average adjacent samples before downsampling to keep the mic check lightweight.
@@ -116,29 +123,34 @@ export class ExerciseAudio {
 
       notes.forEach((note, index) => {
         const time = start + index * (duration + 0.05);
-        const oscillator = context.createOscillator();
-        const gain = context.createGain();
-        oscillator.type = 'triangle';
-        oscillator.frequency.value = midiFrequency(note);
-        gain.gain.setValueAtTime(0.0001, time);
-        gain.gain.exponentialRampToValueAtTime(0.2, time + 0.025);
-        gain.gain.exponentialRampToValueAtTime(0.12, time + duration - 0.09);
-        gain.gain.exponentialRampToValueAtTime(0.0001, time + duration);
-        oscillator.connect(gain);
-        gain.connect(context.destination);
-        oscillators.set(oscillator, gain);
+        const fundamental = midiFrequency(note);
+        for (const { harmonic, peak, decay = duration } of pianoPartials) {
+          const length = Math.min(duration, decay);
+          const release = Math.min(0.09, length / 3);
+          const oscillator = context.createOscillator();
+          const gain = context.createGain();
+          oscillator.type = 'sine';
+          oscillator.frequency.value = fundamental * harmonic;
+          gain.gain.setValueAtTime(quiet, time);
+          gain.gain.exponentialRampToValueAtTime(peak, time + 0.018);
+          gain.gain.exponentialRampToValueAtTime(peak * 0.45, time + length - release);
+          gain.gain.exponentialRampToValueAtTime(quiet, time + length);
+          oscillator.connect(gain);
+          gain.connect(context.destination);
+          oscillators.set(oscillator, gain);
 
-        oscillator.onended = () => {
-          oscillator.disconnect();
-          gain.disconnect();
-          oscillators.delete(oscillator);
-          if (!oscillators.size) {
-            this.#playback = undefined;
-            resolve();
-          }
-        };
-        oscillator.start(time);
-        oscillator.stop(time + duration);
+          oscillator.onended = () => {
+            oscillator.disconnect();
+            gain.disconnect();
+            oscillators.delete(oscillator);
+            if (!oscillators.size) {
+              this.#playback = undefined;
+              resolve();
+            }
+          };
+          oscillator.start(time);
+          oscillator.stop(time + length);
+        }
       });
     });
   }
