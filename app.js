@@ -1,6 +1,6 @@
 import { ExerciseAudio } from './audio.js?v=live-pitch';
-import { LEVELS, RANGES, generateRound, noteName, pitchName } from './exercise.js';
-import { renderNotation } from './notation.js';
+import { KUMAD_START, LEVELS, RANGES, generateRound, noteName, pitchName } from './exercise.js?v=kumad';
+import { renderNotation } from './notation.js?v=kumad';
 import { renderPitchMeter } from './pitch-meter.js?v=live-pitch';
 import { phoneRotation } from './rotation.js';
 
@@ -13,7 +13,7 @@ const ui = Object.fromEntries(
     'secondary', 'result-actions', 'play-answer', 'play-chain', 'level-list', 'range',
     'auto-check', 'storage-status', 'practice', 'classroom-toggle', 'track-pitch',
     'arrow-hint', 'track-hint', 'touch-hint', 'rotation-setting', 'rotation-check',
-    'rotation-status', 'meter-announcement']
+    'rotation-status', 'meter-announcement', 'kumad-set', 'kumad-level-list']
     .map(id => [id, document.getElementById(id)]),
 );
 
@@ -29,18 +29,19 @@ function loadProgress() {
     return Number.isSafeInteger(count) && count >= 0 ? count : 0;
   });
   const unlocked = highestLevel(completed);
+  const level = saved?.level;
   return {
     completed,
-    level: Number.isInteger(saved?.level) && saved.level >= 0 && saved.level <= unlocked
-      ? saved.level : unlocked,
+    level: Number.isInteger(level) && level >= 0 && level < LEVELS.length
+      && (level <= unlocked || level >= KUMAD_START) ? level : unlocked,
     range: RANGES[saved?.range] ? Number(saved.range) : 0,
     autoCheck: saved?.autoCheck === true,
   };
 }
 
 function highestLevel(completed) {
-  const firstIncomplete = completed.findIndex(count => count < ROUNDS_PER_LEVEL);
-  return firstIncomplete === -1 ? LEVELS.length - 1 : firstIncomplete;
+  const firstIncomplete = completed.slice(0, KUMAD_START).findIndex(count => count < ROUNDS_PER_LEVEL);
+  return firstIncomplete === -1 ? KUMAD_START - 1 : firstIncomplete;
 }
 
 function saveProgress() {
@@ -77,6 +78,7 @@ ui.range.value = String(progress.range);
 ui['auto-check'].checked = progress.autoCheck;
 ui['rotation-setting'].hidden = !phoneRotation.available;
 ui['rotation-check'].checked = false;
+ui['kumad-set'].open = progress.level >= KUMAD_START;
 
 const holdButton = ui['track-pitch'];
 const practiceActions = [ui.primary, ui.secondary, holdButton, ui['play-answer'], ui['play-chain']];
@@ -98,6 +100,7 @@ function renderLevels() {
   ui['total-rounds'].textContent = `${plural(total, 'round')} finished`;
   const unlocked = highestLevel(progress.completed);
   const entries = LEVELS.map((level, index) => {
+    const isKuMAd = index >= KUMAD_START;
     const item = document.createElement('li');
     const button = document.createElement('button');
     const number = document.createElement('span');
@@ -108,7 +111,7 @@ function renderLevels() {
 
     button.type = 'button';
     button.className = 'level-button';
-    button.disabled = index > unlocked;
+    button.disabled = !isKuMAd && index > unlocked;
     if (index === progress.level) button.setAttribute('aria-current', 'true');
     number.className = 'level-number';
     number.textContent = index + 1;
@@ -117,17 +120,25 @@ function renderLevels() {
     detail.className = 'level-steps';
     detail.textContent = level.detail;
     count.className = 'level-count';
-    const finished = Math.min(progress.completed[index], ROUNDS_PER_LEVEL);
-    count.textContent = button.disabled ? 'Locked' : `${finished}/${ROUNDS_PER_LEVEL}`;
-    if (!button.disabled) count.setAttribute('aria-label', `${finished} of ${ROUNDS_PER_LEVEL} rounds`);
+    if (isKuMAd) {
+      const finished = progress.completed[index];
+      count.textContent = `${finished} played`;
+      count.setAttribute('aria-label', `${plural(finished, 'round')} played`);
+    } else {
+      const finished = Math.min(progress.completed[index], ROUNDS_PER_LEVEL);
+      count.textContent = button.disabled ? 'Locked' : `${finished}/${ROUNDS_PER_LEVEL}`;
+      if (!button.disabled) count.setAttribute('aria-label', `${finished} of ${ROUNDS_PER_LEVEL} rounds`);
+    }
 
-    description.append(name, detail);
+    description.append(name);
+    if (level.detail) description.append(detail);
     button.append(number, description, count);
     button.addEventListener('click', () => chooseLevel(index));
     item.append(button);
     return item;
   });
-  ui['level-list'].replaceChildren(...entries);
+  ui['level-list'].replaceChildren(...entries.slice(0, KUMAD_START));
+  ui['kumad-level-list'].replaceChildren(...entries.slice(KUMAD_START));
 }
 
 function text(element, value) {
@@ -184,7 +195,9 @@ function render() {
     secondary = mic && !tracking ? 'Cancel pitch check' : 'Check my pitch';
   }
 
-  text(ui['round-level'], `Level ${progress.level + 1} · ${level.name}`);
+  text(ui['round-level'], progress.level >= KUMAD_START
+    ? `KuMAd · ${plural(level.steps, 'interval')}`
+    : `Level ${progress.level + 1} · ${level.name}`);
   text(ui['round-position'], position);
   text(ui['prompt-symbol'], symbol);
   setTitle(title, direction);
@@ -203,6 +216,7 @@ function render() {
   ui['play-answer'].disabled = Boolean(playback || mic);
   ui['play-chain'].disabled = Boolean(playback || mic);
   ui['answer-score'].hidden = !isResult;
+  ui['result-visuals'].toggleAttribute('data-long-chain', isResult && progress.level >= KUMAD_START);
   if (isResult && renderedScore !== round) {
     renderNotation(ui['answer-score'], round);
     renderedScore = round;
@@ -586,7 +600,7 @@ document.addEventListener('keydown', event => {
   }
 
   const focusedAction = practiceActions.includes(event.target);
-  if (!focusedAction && event.target.closest?.('button, a, [tabindex]')) return;
+  if (!focusedAction && event.target.closest?.('button, a, summary, [tabindex]')) return;
   if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
     const actions = availableActions();
     if (actions.length < 2) return;

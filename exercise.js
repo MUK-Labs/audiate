@@ -20,12 +20,23 @@ const OCTAVES = [
   ['perfect octave', 'P8', 8, 12],
 ];
 
-export const LEVELS = [
+const STANDARD_LEVELS = [
   { name: 'First steps', steps: 1, detail: 'Seconds and thirds', intervals: SMALL_INTERVALS },
   { name: 'Two jumps', steps: 2, detail: 'Up to a fourth', intervals: FOURTHS },
   { name: 'Three jumps', steps: 3, detail: 'Up to a fifth', intervals: FIFTHS },
   { name: 'Four jumps', steps: 4, detail: 'Up to a sixth', intervals: SIXTHS },
   { name: 'Five jumps', steps: 5, detail: 'Up to an octave', intervals: OCTAVES },
+];
+
+export const KUMAD_START = STANDARD_LEVELS.length;
+export const LEVELS = [
+  ...STANDARD_LEVELS,
+  ...['Six', 'Seven', 'Eight', 'Nine', 'Ten'].map((name, index) => ({
+    name: `${name} jumps`,
+    steps: KUMAD_START + index + 1,
+    detail: 'Up to an octave',
+    intervals: OCTAVES,
+  })),
 ];
 
 export const RANGES = [

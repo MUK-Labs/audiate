@@ -4,7 +4,7 @@
 
 Start a round to hear one pitch. Follow each interval silently as it appears, then sing the final note. Use **Left** and **Right** to choose among the round actions, then **Space** or **Enter** to activate the focused button. Reveal the answer to hear it and read the full chain on a staff.
 
-There are five levels. Finish three rounds at a level to unlock the next one. You can return to unlocked levels and choose a comfortable singing range. This browser remembers your progress and settings.
+The main practice path has five levels. Finish three rounds at a level to unlock the next one. Open the **KuMAd set** under Practice path to choose a chain of six to ten intervals at any time. Both paths use your chosen singing range. This browser remembers your progress and settings.
 
 Choose **Classroom view** to fill the screen with the exercise and enlarge the cues and controls. Press **Escape** or choose **Exit classroom view** to return. Browsers without fullscreen support display the same layout inside the window.
 

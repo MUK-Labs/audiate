@@ -198,6 +198,11 @@ kbd {
 .level-name { display: block; font-weight: 650; }
 .level-steps { display: block; color: var(--muted); font-size: .8125rem; }
 .level-count { font-size: .8125rem; font-variant-numeric: tabular-nums; }
+.kumad-set { margin-top: 13px; border-top: 1px solid var(--line); padding-top: 11px; }
+.kumad-set summary { padding: 3px 6px; cursor: pointer; font-size: .9375rem; font-weight: 680; }
+.kumad-set summary::marker { color: var(--accent); }
+.kumad-set summary span { float: right; color: var(--muted); font-size: .8125rem; font-weight: 400; }
+.kumad-set .level-list { margin-top: 6px; }
 .range-label { display: block; margin: 12px 0 5px; font-size: .875rem; }
 select {
   width: 100%;
@@ -279,6 +284,7 @@ select {
     align-items: center;
     gap: 24px;
   }
+  .classroom-view .result-visuals[data-long-chain] { grid-template-columns: minmax(0, 1fr); }
 }
 
 @media (max-width: 750px) {

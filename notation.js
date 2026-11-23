@@ -182,9 +182,11 @@ export function renderNotation(container, round) {
   });
 
   const scroll = document.createElement('div');
+  scroll.tabIndex = 0;
+  scroll.setAttribute('role', 'region');
+  scroll.setAttribute('aria-label', 'Musical notation');
   scroll.style.overflowX = 'auto';
   scroll.style.maxWidth = '100%';
   scroll.append(svg);
   container.replaceChildren(scroll);
-  if (scroll.scrollWidth > scroll.clientWidth) scroll.tabIndex = 0;
 }
